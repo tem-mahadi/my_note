@@ -24,7 +24,7 @@ A beautiful, modern, and minimalist Notes Management Application built with Flut
 
 1. **Clone the repository**
    ```bash
-   git clone <repository_url>
+   git clone https://github.com/tem-mahadi/my_note.git
    cd my_note
    ```
 
