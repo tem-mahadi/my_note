@@ -56,7 +56,10 @@ A beautiful, modern, and minimalist Notes Management Application built with Flut
 
 ## Screenshots 📸
 
-*(Add your screenshots here)*
+<p align="center">
+  <img src="1.ScreenShots/Screenshot_20260704_182742.png" width="300" />
+  <img src="1.ScreenShots/Screenshot_20260704_182813.png" width="300" />
+</p>
 
 ## Architecture 🏗️
 
