@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/note.dart';
 import '../services/note_service.dart';
+import '../views/profile_page.dart';
 import 'add_edit_note_screen.dart';
 
 class NotesListScreen extends StatefulWidget {
@@ -38,6 +39,12 @@ class _NotesListScreenState extends State<NotesListScreen>
     return DateFormat('MMM d, yyyy').format(dateTime);
   }
 
+  void _navigateToProfile() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
+  }
+
   void _navigateToAddNote() {
     Navigator.of(context).push(
       PageRouteBuilder(
@@ -45,13 +52,13 @@ class _NotesListScreenState extends State<NotesListScreen>
             const AddEditNoteScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 1),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-            )),
+            position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+                .animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
             child: child,
           );
         },
@@ -106,7 +113,10 @@ class _NotesListScreenState extends State<NotesListScreen>
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFFF6584),
             ),
-            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -122,11 +132,7 @@ class _NotesListScreenState extends State<NotesListScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F0F1E),
-              Color(0xFF1A1A2E),
-              Color(0xFF16213E),
-            ],
+            colors: [Color(0xFF0F0F1E), Color(0xFF1A1A2E), Color(0xFF16213E)],
           ),
         ),
         child: SafeArea(
@@ -196,6 +202,23 @@ class _NotesListScreenState extends State<NotesListScreen>
                       ),
                     ),
                   ],
+                ),
+              ),
+              // Profile / settings entry point — leads to logout & unsubscribe.
+              IconButton(
+                onPressed: _navigateToProfile,
+                tooltip: 'Profile',
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_outline_rounded,
+                    color: Color(0xFF8B83FF),
+                    size: 22,
+                  ),
                 ),
               ),
             ],
@@ -291,9 +314,7 @@ class _NotesListScreenState extends State<NotesListScreen>
           decoration: BoxDecoration(
             color: const Color(0xFF1E1E2E),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.06),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.2),
@@ -314,10 +335,7 @@ class _NotesListScreenState extends State<NotesListScreen>
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        accentColor,
-                        accentColor.withValues(alpha: 0.4),
-                      ],
+                      colors: [accentColor, accentColor.withValues(alpha: 0.4)],
                     ),
                   ),
                 ),
@@ -529,16 +547,15 @@ class _NoteCardAnimatedState extends State<_NoteCardAnimated>
       duration: const Duration(milliseconds: 500),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.15),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     // Stagger the animation based on card index
     Future.delayed(Duration(milliseconds: 80 * widget.index), () {
@@ -556,10 +573,7 @@ class _NoteCardAnimatedState extends State<_NoteCardAnimated>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _slideAnimation, child: widget.child),
     );
   }
 }

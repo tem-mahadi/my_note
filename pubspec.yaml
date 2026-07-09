@@ -39,6 +39,11 @@ dependencies:
   firebase_core: ^3.13.0
   cloud_firestore: ^5.6.9
 
+  # bdapps / Network / Storage
+  http: ^1.6.0
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
+
   # UI & Utilities
   google_fonts: ^6.2.1
   intl: ^0.20.3
