@@ -39,7 +39,7 @@ class MyNoteApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'My Notes',
+        title: 'My iNote',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,

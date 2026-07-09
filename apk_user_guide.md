@@ -1,6 +1,6 @@
-# My Notes — APK User Guide 📝
+# My iNote — APK User Guide 📝
 
-Welcome to **My Notes**, a sleek, dark-mode notes app powered by Firebase, with built-in AI features through OpenRouter. This guide walks you through installing the APK, subscribing, and using every feature.
+Welcome to **My iNote**, a sleek, dark-mode notes app powered by Firebase, with built-in AI features through OpenRouter. This guide walks you through installing the APK, subscribing, and using every feature.
 
 ---
 
@@ -8,12 +8,12 @@ Welcome to **My Notes**, a sleek, dark-mode notes app powered by Firebase, with 
 
 1. Open a browser on your Android phone.
 2. Visit the official site:
-   **[https://mahadi-release.ruetandroiddevelopers.com/MyNote/](https://mahadi-release.ruetandroiddevelopers.com/MyNote/)**
+   **[https://mahadi-release.ruetandroiddevelopers.com/My-iNote/](https://mahadi-release.ruetandroiddevelopers.com/My-iNote/)**
 3. Tap the **Download APK** button.
 4. If Chrome warns *"This type of file can harm your device"*, tap **Download anyway**. This warning appears for any APK downloaded outside the Play Store.
 
 > Direct download link:
-> `https://mahadi-release.ruetandroiddevelopers.com/MyNote/MyNote_v1.0.apk`
+> `https://mahadi-release.ruetandroiddevelopers.com/My-iNote/My-iNote_v1.0.apk`
 
 ---
 
@@ -33,7 +33,7 @@ Since the app isn't coming from the Play Store, Android needs one-time permissio
 
 1. Tap **Install**.
 2. Wait a few seconds.
-3. Tap **Open** to launch My Notes.
+3. Tap **Open** to launch My iNote.
 
 > **Tip:** If installation fails, make sure your phone runs **Android 6.0 (Marshmallow)** or newer. The APK targets `minSdk 23`.
 
@@ -41,7 +41,7 @@ Since the app isn't coming from the Play Store, Android needs one-time permissio
 
 ## 3. Subscribe (login)
 
-My Notes is a bdapps-powered service. A small subscription is required to verify your number.
+My iNote is a bdapps-powered service. A small subscription is required to verify your number.
 
 > [!IMPORTANT]
 > **Subscription charge: 2.78 BDT** (VAT + SC + SD included).
@@ -83,7 +83,7 @@ Notes sync in real time with Firestore. Whatever you write on your phone shows u
 
 ## 5. AI features (optional)
 
-My Notes ships with five AI features powered by **OpenRouter**. They are **off by default** — you choose whether to enable them.
+My iNote ships with five AI features powered by **OpenRouter**. They are **off by default** — you choose whether to enable them.
 
 ### 5.1 Set up your API key
 
@@ -92,7 +92,7 @@ My Notes ships with five AI features powered by **OpenRouter**. They are **off b
 3. Paste your OpenRouter key (get one at [openrouter.ai](https://openrouter.ai) → *Keys*).
 4. Tap **Save**.
 
-Your key is stored on the device using Android's EncryptedSharedPreferences. It is never sent to My Notes servers.
+Your key is stored on the device using Android's EncryptedSharedPreferences. It is never sent to My iNote servers.
 
 > Want to skip OpenRouter entirely? Set the **Proxy base URL** to your own backend. Then everyone uses your server's key, not their own.
 
@@ -115,7 +115,7 @@ To access the first three, open a note, tap the **sparkles icon** (✨) in the a
 Open **Profile** from the home screen.
 
 - **Logout** — clears the local session on this device. Your **bdapps subscription stays active**, so you can log back in on the same number and pick up where you left off.
-- **Unsubscribe** — cancels the bdapps subscription itself. You will be logged out and need to resubscribe to use My Notes again.
+- **Unsubscribe** — cancels the bdapps subscription itself. You will be logged out and need to resubscribe to use My iNote again.
 
 > [!TIP]
 > Switching to a new phone? Tap **Logout** on the old one, then **Subscribe / Login** on the new one with the same number — your notes follow you.
@@ -125,7 +125,7 @@ Open **Profile** from the home screen.
 ## 7. Troubleshooting
 
 **"App not installed"**
-- An older copy may still be installed. Uninstall My Notes from *Settings → Apps*, then re-install.
+- An older copy may still be installed. Uninstall My iNote from *Settings → Apps*, then re-install.
 
 **"Couldn't send OTP"**
 - Confirm you're using a **Robi** or **Airtel** SIM.
@@ -150,4 +150,4 @@ Open **Profile** from the home screen.
 
 ---
 
-*Enjoy writing with My Notes ✨*
+*Enjoy writing with My iNote ✨*

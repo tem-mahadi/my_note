@@ -46,7 +46,7 @@ class AIService {
       'Authorization': 'Bearer ${config.apiKey}',
       // OpenRouter recommends these for attribution / ranking.
       'HTTP-Referer': 'https://my-note.local',
-      'X-Title': 'My Notes',
+      'X-Title': 'My iNote',
     };
   }
 
@@ -87,7 +87,7 @@ class AIService {
       'messages': messages.map((m) => m.toJson()).toList(),
       'temperature': temperature,
       'stream': false,
-      if (maxTokens != null) 'max_tokens': maxTokens,
+      'max_tokens': ?maxTokens,
     };
 
     final response = await _post('/chat/completions', body);
@@ -117,7 +117,7 @@ class AIService {
       'messages': messages.map((m) => m.toJson()).toList(),
       'temperature': temperature,
       'stream': true,
-      if (maxTokens != null) 'max_tokens': maxTokens,
+      'max_tokens': ?maxTokens,
     };
 
     final uri = Uri.parse('${config.baseUrl}/chat/completions');

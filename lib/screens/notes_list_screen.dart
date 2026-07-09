@@ -322,7 +322,7 @@ class _NotesListScreenState extends State<NotesListScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'My Notes',
+                      'My iNote',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,

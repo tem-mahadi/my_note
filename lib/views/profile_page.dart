@@ -50,7 +50,7 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         content: Text(
-          'This will cancel your bdapps subscription. You will be logged out and will need to resubscribe to use My Notes again.',
+          'This will cancel your bdapps subscription. You will be logged out and will need to resubscribe to use My iNote again.',
           style: GoogleFonts.poppins(color: Colors.white70),
         ),
         actions: [

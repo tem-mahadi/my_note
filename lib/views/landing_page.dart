@@ -21,7 +21,7 @@ class _LandingPageState extends State<LandingPage>
   late Animation<double> _pulseAnim;
 
   static const String _apkUrl =
-      'https://mahadi-release.ruetandroiddevelopers.com/MyNote/MyNote_v1.0.apk';
+      'https://mahadi-release.ruetandroiddevelopers.com/My-iNote/My-iNote_v1.0.apk';
 
   @override
   void initState() {
@@ -140,7 +140,7 @@ class _LandingPageState extends State<LandingPage>
           ),
           const SizedBox(width: 12),
           Text(
-            'My Notes',
+            'My iNote',
             style: GoogleFonts.outfit(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -526,7 +526,7 @@ class _LandingPageState extends State<LandingPage>
         children: [
           // Section title
           Text(
-            'Why My Notes?',
+            'Why My iNote?',
             style: GoogleFonts.outfit(
               fontSize: isWide ? 36 : 28,
               fontWeight: FontWeight.w800,
@@ -663,7 +663,7 @@ class _LandingPageState extends State<LandingPage>
                         ),
                       ),
                       child: Text(
-                        '🚀 MY NOTES PRO',
+                        '🚀 MY INOTE PRO',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.outfit(
                           fontSize: 13,
@@ -1007,7 +1007,7 @@ class _LandingPageState extends State<LandingPage>
       child: Column(
         children: [
           Text(
-            '© ${DateTime.now().year} My Notes. All rights reserved.',
+            '© ${DateTime.now().year} My iNote. All rights reserved.',
             style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
           ),
           const SizedBox(height: 4),
