@@ -48,6 +48,13 @@ dependencies:
   google_fonts: ^6.2.1
   intl: ^0.20.3
 
+  # State management
+  provider: ^6.1.2
+
+  # AI / OpenRouter
+  flutter_secure_storage: ^9.2.2
+  flutter_markdown: ^0.7.4+1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

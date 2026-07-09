@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../core/ai/ai_service.dart';
 import '../models/note.dart';
 import '../services/note_service.dart';
+import 'ai_menu_sheet.dart' show friendlyAIError;
+import 'ai_menu_sheet.dart' show AIMenuSheet;
 
 class AddEditNoteScreen extends StatefulWidget {
   final Note? note;
-
   const AddEditNoteScreen({super.key, this.note});
 
   @override
@@ -17,9 +21,14 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
+  TextSelection _descriptionSelection = const TextSelection.collapsed(
+    offset: 0,
+  );
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _isSaving = false;
+  bool _isContinuing = false;
 
   bool get _isEditing => widget.note != null;
 
@@ -27,8 +36,13 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.note?.title ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.note?.description ?? '');
+    _descriptionController = TextEditingController(
+      text: widget.note?.description ?? '',
+    );
+    _descriptionSelection = TextSelection.collapsed(
+      offset: _descriptionController.text.length,
+    );
+    _descriptionController.addListener(_syncSelection);
 
     _animationController = AnimationController(
       vsync: this,
@@ -43,10 +57,70 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
 
   @override
   void dispose() {
+    _descriptionController.removeListener(_syncSelection);
     _titleController.dispose();
     _descriptionController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  void _syncSelection() {
+    _descriptionSelection = _descriptionController.selection;
+  }
+
+  String _textBeforeCursor() {
+    final sel = _descriptionSelection;
+    final clamped = sel.start.clamp(0, _descriptionController.text.length);
+    return _descriptionController.text.substring(0, clamped);
+  }
+
+  Future<void> _continueWriting() async {
+    final textBeforeCursor = _textBeforeCursor().trim();
+    if (textBeforeCursor.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Place your cursor where you want the AI to continue.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _isContinuing = true);
+    final ai = context.read<AIService>();
+    final buffer = StringBuffer();
+    try {
+      await ai.continueWriting(
+        textBeforeCursor: textBeforeCursor,
+        onDelta: (delta) {
+          buffer.write(delta);
+          final currentText = _descriptionController.text;
+          final insertAt = _descriptionSelection.start.clamp(
+            0,
+            currentText.length,
+          );
+          final newText =
+              currentText.substring(0, insertAt) +
+              delta +
+              currentText.substring(insertAt);
+          _descriptionController.value = TextEditingValue(
+            text: newText,
+            selection: TextSelection.collapsed(offset: insertAt + delta.length),
+          );
+        },
+      );
+      if (buffer.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No continuation was generated.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(friendlyAIError(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _isContinuing = false);
+    }
   }
 
   Future<void> _saveNote() async {
@@ -55,17 +129,22 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
     setState(() => _isSaving = true);
 
     try {
+      final newTitle = _titleController.text.trim();
+      final newDescription = _descriptionController.text.trim();
+      String? savedId;
       if (_isEditing) {
         await _noteService.updateNote(
           widget.note!.id,
-          _titleController.text.trim(),
-          _descriptionController.text.trim(),
+          newTitle,
+          newDescription,
         );
+        savedId = widget.note!.id;
       } else {
-        await _noteService.createNote(
-          _titleController.text.trim(),
-          _descriptionController.text.trim(),
-        );
+        savedId = await _noteService.createNote(newTitle, newDescription);
+      }
+
+      if (savedId != null) {
+        _refreshEmbedding(savedId, newTitle, newDescription);
       }
 
       if (mounted) {
@@ -73,7 +152,9 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isEditing ? 'Note updated successfully' : 'Note created successfully',
+              _isEditing
+                  ? 'Note updated successfully'
+                  : 'Note created successfully',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: const Color(0xFF43E97B),
@@ -107,6 +188,21 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
     }
   }
 
+  Future<void> _refreshEmbedding(
+    String id,
+    String title,
+    String description,
+  ) async {
+    final ai = context.read<AIService>();
+    if (ai.config.apiKey == null || ai.config.apiKey!.isEmpty) return;
+    try {
+      final combined = '$title\n\n$description';
+      final embedding = await ai.embed(combined);
+      if (embedding.isEmpty) return;
+      await _noteService.updateEmbedding(id, embedding);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,11 +211,7 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F0F1E),
-              Color(0xFF1A1A2E),
-              Color(0xFF16213E),
-            ],
+            colors: [Color(0xFF0F0F1E), Color(0xFF1A1A2E), Color(0xFF16213E)],
           ),
         ),
         child: SafeArea(
@@ -142,7 +234,6 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
       child: Row(
         children: [
-          // Back button
           IconButton(
             onPressed: () => Navigator.pop(context),
             icon: Container(
@@ -159,7 +250,6 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
             ),
           ),
           const SizedBox(width: 8),
-          // Title
           Expanded(
             child: Text(
               _isEditing ? 'Edit Note' : 'Create Note',
@@ -171,7 +261,26 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
               ),
             ),
           ),
-          // Save button
+          if (_isEditing)
+            IconButton(
+              tooltip: 'AI actions',
+              onPressed: () => AIMenuSheet.show(context, widget.note!),
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6C63FF), Color(0xFF4834DF)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          const SizedBox(width: 4),
           _buildSaveButton(),
         ],
       ),
@@ -241,17 +350,16 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
         physics: const BouncingScrollPhysics(),
         children: [
-          // Title field
           _buildSectionLabel('Title', Icons.title_rounded),
           const SizedBox(height: 10),
           _buildTitleField(),
           const SizedBox(height: 28),
-          // Description field
           _buildSectionLabel('Description', Icons.description_rounded),
           const SizedBox(height: 10),
           _buildDescriptionField(),
+          const SizedBox(height: 14),
+          _buildContinueWritingRow(),
           const SizedBox(height: 32),
-          // Bottom save button (large)
           _buildBottomSaveButton(),
         ],
       ),
@@ -303,24 +411,15 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFF6C63FF),
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFFFF6584),
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFFFF6584), width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFFFF6584),
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFFFF6584), width: 1.5),
         ),
         errorStyle: const TextStyle(color: Color(0xFFFF6584)),
       ),
@@ -337,11 +436,7 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
   Widget _buildDescriptionField() {
     return TextFormField(
       controller: _descriptionController,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 15,
-        height: 1.6,
-      ),
+      style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.6),
       decoration: InputDecoration(
         hintText: 'Write your note here...',
         hintStyle: TextStyle(
@@ -357,24 +452,15 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFF6C63FF),
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFFFF6584),
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFFFF6584), width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color(0xFFFF6584),
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFFFF6584), width: 1.5),
         ),
         errorStyle: const TextStyle(color: Color(0xFFFF6584)),
         counterStyle: TextStyle(
@@ -392,6 +478,63 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen>
         }
         return null;
       },
+    );
+  }
+
+  Widget _buildContinueWritingRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Place your cursor and tap to let the AI keep writing.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.45),
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: _isContinuing ? null : _continueWriting,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF6C63FF).withValues(alpha: 0.45),
+              ),
+            ),
+            child: _isContinuing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF8B83FF),
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Color(0xFF8B83FF),
+                        size: 16,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Continue writing',
+                        style: TextStyle(
+                          color: Color(0xFF8B83FF),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
     );
   }
 

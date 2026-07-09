@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../core/ai/ai_exceptions.dart';
+import '../core/ai/ai_models.dart';
+import '../core/ai/ai_secure_storage.dart';
+import '../core/ai/ai_service.dart';
+import '../core/ai/semantic_search.dart';
 import '../models/note.dart';
 import '../services/note_service.dart';
 import '../views/profile_page.dart';
+import 'ai_menu_sheet.dart';
 import 'add_edit_note_screen.dart';
 
 class NotesListScreen extends StatefulWidget {
@@ -15,6 +23,14 @@ class NotesListScreen extends StatefulWidget {
 class _NotesListScreenState extends State<NotesListScreen>
     with TickerProviderStateMixin {
   final NoteService _noteService = NoteService();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+
+  // The currently visible notes — either all notes (search empty) or the
+  // semantic-search ranking result (when there's a query).
+  List<Note> _displayed = const [];
+  // Map of noteId -> similarity score (only populated during a search).
+  Map<String, double> _scores = const {};
 
   // Accent colors for note cards — cycles through these
   static const List<Color> _accentColors = [
@@ -27,6 +43,16 @@ class _NotesListScreenState extends State<NotesListScreen>
     Color(0xFF00D2FF), // Cyan
     Color(0xFFFC5C7D), // Coral
   ];
+
+  bool _isSearching = false;
+  String? _lastError;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   String _timeAgo(DateTime dateTime) {
     final now = DateTime.now();
@@ -124,6 +150,117 @@ class _NotesListScreenState extends State<NotesListScreen>
     return result ?? false;
   }
 
+  Future<void> _runSemanticSearch(String query) async {
+    final ai = context.read<AIService>();
+    final storage = context.read<AISecureStorage>();
+
+    if ((await storage.readApiKey() ?? '').isEmpty) {
+      _showMissingKeyHint();
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _lastError = null;
+    });
+
+    try {
+      // Embed the user's query and all note bodies, then rank.
+      final allNotes = await _noteService.fetchAllNotes();
+      if (allNotes.isEmpty) {
+        setState(() {
+          _isSearching = false;
+          _displayed = const [];
+          _scores = const {};
+        });
+        return;
+      }
+
+      final queryEmbedding = await ai.embed(query);
+
+      // We rank against whichever notes already have an embedding. Notes
+      // without an embedding were created before this feature was rolled
+      // out; we simply skip them in semantic search (they appear in the
+      // unfiltered list when the query is cleared).
+      final candidates = <Note>[];
+      for (final n in allNotes) {
+        if (n.embedding != null && n.embedding!.isNotEmpty) {
+          candidates.add(n);
+        }
+      }
+
+      List<SemanticSearchResult> results = const [];
+      if (candidates.isNotEmpty) {
+        results = SemanticSearch.rank(
+          queryEmbedding: queryEmbedding,
+          candidates: candidates
+              .map((n) => MapEntry<String, List<double>>(n.id, n.embedding!))
+              .toList(),
+        );
+      }
+
+      final byId = {for (final n in allNotes) n.id: n};
+      final ranked = <Note>[];
+      final scores = <String, double>{};
+      for (final r in results) {
+        final note = byId[r.noteId];
+        if (note != null) {
+          ranked.add(note);
+          scores[r.noteId] = SemanticSearch.normalise(r.score);
+        }
+      }
+
+      setState(() {
+        _isSearching = false;
+        _displayed = ranked;
+        _scores = scores;
+      });
+    } on AIException catch (e) {
+      setState(() {
+        _isSearching = false;
+        _lastError = friendlyAIError(e);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(friendlyAIError(e))));
+      }
+    } catch (e) {
+      setState(() {
+        _isSearching = false;
+        _lastError = 'Search failed: $e';
+      });
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _displayed = const [];
+      _scores = const {};
+      _lastError = null;
+    });
+  }
+
+  void _showMissingKeyHint() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Add your OpenRouter API key in Profile → AI Settings.',
+        ),
+        action: SnackBarAction(
+          label: 'Open',
+          textColor: const Color(0xFF8B83FF),
+          onPressed: _navigateToProfile,
+        ),
+      ),
+    );
+  }
+
+  void _onNoteLongPress(Note note) {
+    AIMenuSheet.show(context, note);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,6 +277,7 @@ class _NotesListScreenState extends State<NotesListScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
+              _buildSearchBar(),
               Expanded(child: _buildNotesList()),
             ],
           ),
@@ -240,6 +378,82 @@ class _NotesListScreenState extends State<NotesListScreen>
     );
   }
 
+  Widget _buildSearchBar() {
+    final hasQuery = _searchController.text.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocus,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (q) {
+            if (q.trim().isEmpty) {
+              _clearSearch();
+            } else {
+              _runSemanticSearch(q);
+            }
+          },
+          onChanged: (q) {
+            // Clear results when the user empties the field.
+            if (q.trim().isEmpty && _displayed.isNotEmpty) {
+              setState(() {
+                _displayed = const [];
+                _scores = const {};
+                _lastError = null;
+              });
+            }
+            setState(() {}); // refresh suffix button
+          },
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'Semantic search… (press enter)',
+            hintStyle: TextStyle(
+              color: Colors.white.withValues(alpha: 0.35),
+              fontSize: 14,
+            ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            prefixIcon: Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.white.withValues(alpha: 0.5),
+              size: 20,
+            ),
+            suffixIcon: _isSearching
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF8B83FF),
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  )
+                : hasQuery
+                ? IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                    onPressed: _clearSearch,
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNotesList() {
     return StreamBuilder<List<Note>>(
       stream: _noteService.streamNotes(),
@@ -252,10 +466,16 @@ class _NotesListScreenState extends State<NotesListScreen>
           return _buildLoadingState();
         }
 
-        final notes = snapshot.data ?? [];
+        final allNotes = snapshot.data ?? const [];
+        final showingSearch = _searchController.text.trim().isNotEmpty;
+        final notes = showingSearch ? _displayed : allNotes;
 
-        if (notes.isEmpty) {
+        if (allNotes.isEmpty) {
           return _buildEmptyState();
+        }
+
+        if (showingSearch && notes.isEmpty && !_isSearching) {
+          return _buildNoMatchesState();
         }
 
         return ListView.builder(
@@ -263,9 +483,11 @@ class _NotesListScreenState extends State<NotesListScreen>
           physics: const BouncingScrollPhysics(),
           itemCount: notes.length,
           itemBuilder: (context, index) {
+            final note = notes[index];
+            final score = _scores[note.id];
             return _NoteCardAnimated(
               index: index,
-              child: _buildNoteCard(notes[index], index),
+              child: _buildNoteCard(note, index, score: score),
             );
           },
         );
@@ -273,7 +495,7 @@ class _NotesListScreenState extends State<NotesListScreen>
     );
   }
 
-  Widget _buildNoteCard(Note note, int index) {
+  Widget _buildNoteCard(Note note, int index, {double? score}) {
     final accentColor = _accentColors[index % _accentColors.length];
 
     return Dismissible(
@@ -309,6 +531,7 @@ class _NotesListScreenState extends State<NotesListScreen>
       ),
       child: GestureDetector(
         onTap: () => _navigateToEditNote(note),
+        onLongPress: () => _onNoteLongPress(note),
         child: Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
@@ -361,25 +584,49 @@ class _NotesListScreenState extends State<NotesListScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: accentColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _timeAgo(note.updatedAt),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: accentColor,
-                                  fontWeight: FontWeight.w500,
+                            if (score != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF8B83FF,
+                                  ).withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${(score * 100).toStringAsFixed(0)}% match',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF8B83FF),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ] else ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  _timeAgo(note.updatedAt),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: accentColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -446,6 +693,30 @@ class _NotesListScreenState extends State<NotesListScreen>
             style: TextStyle(
               fontSize: 15,
               color: Colors.white.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoMatchesState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 48,
+            color: Colors.white.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _lastError ?? 'No notes match your query',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 14,
             ),
           ),
         ],
