@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'core/ai/ai_config.dart';
 import 'core/ai/ai_secure_storage.dart';
 import 'core/ai/ai_service.dart';
+import 'firebase_options.dart';
 import 'screens/notes_list_screen.dart';
 import 'service/auth_service.dart';
 import 'service/user_data.dart';
@@ -15,7 +16,7 @@ import 'views/login_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Hydrate cached user info (name, mobile, joined date) from SharedPreferences
   // before deciding which screen to show on first launch.
   await UserData.loadData();
